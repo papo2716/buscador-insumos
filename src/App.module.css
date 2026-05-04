@@ -323,9 +323,7 @@
   padding: 16px 20px 0;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 55px;
-  z-index: 5;
+  flex-shrink: 0;
 }
 
 .colTitleRow {
