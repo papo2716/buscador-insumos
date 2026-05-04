@@ -511,3 +511,120 @@
   .searchBox { padding: 12px 16px; }
   .gSearch, .gPrest { min-width: 100%; }
 }
+
+/* ─── ADMIN ───────────────────────────────────────────────── */
+.headerRight {
+  display: flex;
+  align-items: center;
+}
+
+.btnAdminLink {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btnAdminLink:hover { border-color: var(--accent-yellow); color: var(--accent-yellow); }
+
+.adminPanel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adminBadge {
+  font-size: 12px;
+  color: var(--accent-yellow);
+  font-weight: 600;
+}
+
+.btnActualizar {
+  background: var(--accent-yellow);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btnActualizar:hover { opacity: 0.85; }
+.btnActualizar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnAdminOut {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btnAdminOut:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* MODAL */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.adminBox {
+  width: 420px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+
+.adminHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.adminBox .loginForm {
+  padding: 24px 28px;
+}
+
+.btnClose {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.btnClose:hover { color: var(--text); }
+
+/* SUCCESS BANNER */
+.successBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(34, 197, 94, 0.08);
+  border-bottom: 1px solid rgba(34, 197, 94, 0.2);
+  padding: 10px 24px;
+  font-size: 13px;
+  color: var(--accent-green);
+}

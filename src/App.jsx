@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { loadData, clearCache, getCacheTimestamp, setCacheTimestamp } from './dataLoader'
+import { loadDataFromJSON, loadDataFromSheet, clearCache, getCacheTimestamp } from './dataLoader'
+import { subirDataAGitHub } from './github'
 import { buscar, calcularStats } from './search'
 import styles from './App.module.css'
 
-const PASSWORD = '*InsumosAlt2026'
+// ─── CREDENCIALES ─────────────────────────────────────────────────────────────
+const PASSWORD       = '*InsumosAlt2026'
+const ADMIN_USER     = 'administrador'
+const ADMIN_PASSWORD = 'PaPo2716Mat'
 
 const PRESTADORES = [
   'Todos',
@@ -35,9 +39,9 @@ function formatDate(val) {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-// ─── LOGIN ────────────────────────────────────────────────────────────────────
+// ─── LOGIN USUARIO ─────────────────────────────────────────────────────────────
 function Login({ onLogin }) {
-  const [pass, setPass] = useState('')
+  const [pass, setPass]   = useState('')
   const [error, setError] = useState(false)
   const [shake, setShake] = useState(false)
 
@@ -80,18 +84,86 @@ function Login({ onLogin }) {
   )
 }
 
+// ─── LOGIN ADMIN ───────────────────────────────────────────────────────────────
+function AdminLogin({ onLogin, onClose }) {
+  const [user, setUser]   = useState('')
+  const [pass, setPass]   = useState('')
+  const [token, setToken] = useState('')
+  const [error, setError] = useState('')
+  const [shake, setShake] = useState(false)
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (user === ADMIN_USER && pass === ADMIN_PASSWORD && token.trim()) {
+      onLogin(token.trim())
+    } else if (user !== ADMIN_USER || pass !== ADMIN_PASSWORD) {
+      setError('Usuario o contraseña incorrectos')
+      setShake(true)
+      setTimeout(() => setShake(false), 500)
+    } else {
+      setError('Ingresá el token de GitHub')
+    }
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div
+        className={`${styles.adminBox} ${shake ? styles.shake : ''}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.adminHeader}>
+          <span>🔐 Ingreso administrador</span>
+          <button className={styles.btnClose} onClick={onClose}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit} className={styles.loginForm}>
+          <div className={styles.loginField}>
+            <label>Usuario</label>
+            <input
+              type="text"
+              value={user}
+              onChange={e => { setUser(e.target.value); setError('') }}
+              placeholder="administrador"
+              autoFocus
+            />
+          </div>
+          <div className={styles.loginField}>
+            <label>Contraseña</label>
+            <input
+              type="password"
+              value={pass}
+              onChange={e => { setPass(e.target.value); setError('') }}
+              placeholder="••••••••••••••"
+            />
+          </div>
+          <div className={styles.loginField}>
+            <label>Token de GitHub <span className={styles.hint}>(ver instrucciones)</span></label>
+            <input
+              type="password"
+              value={token}
+              onChange={e => { setToken(e.target.value); setError('') }}
+              placeholder="ghp_..."
+            />
+          </div>
+          {error && <span className={styles.loginError}>{error}</span>}
+          <button type="submit" className={styles.btnLogin}>Ingresar como admin →</button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── STATS BAR ────────────────────────────────────────────────────────────────
 function StatsBar({ data, color }) {
   if (!data || data.length === 0) return null
   const precios = data.map(d => parseFloat(d.precio))
-  const stats = calcularStats(precios)
+  const stats   = calcularStats(precios)
   return (
     <div className={styles.statsBar} style={{ '--accent': color }}>
       {[
-        { label: 'Media', val: stats.media },
+        { label: 'Media',   val: stats.media   },
         { label: 'Mediana', val: stats.mediana },
-        { label: 'Mín', val: stats.min },
-        { label: 'Máx', val: stats.max },
+        { label: 'Mín',     val: stats.min     },
+        { label: 'Máx',     val: stats.max     },
       ].map(s => (
         <div key={s.label} className={styles.statItem}>
           <span className={styles.statVal}>{fmt(s.val)}</span>
@@ -103,12 +175,9 @@ function StatsBar({ data, color }) {
 }
 
 // ─── TABLA RESULTADOS ─────────────────────────────────────────────────────────
-function TablaResultados({ data, tipo }) {
+function TablaResultados({ data }) {
   if (!data) return null
-
-  if (data.length === 0) {
-    return <div className={styles.noResults}>Sin coincidencias</div>
-  }
+  if (data.length === 0) return <div className={styles.noResults}>Sin coincidencias</div>
 
   return (
     <div className={styles.tableWrap}>
@@ -145,22 +214,28 @@ function TablaResultados({ data, tipo }) {
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(() => sessionStorage.getItem('auth') === '1')
-  const [data, setData]         = useState({ vias: [], alt: [] })
-  const [loadState, setLoadState] = useState('idle') // idle | loading | ready | error
-  const [cacheTs, setCacheTs]   = useState(null)
-  const [loadMsg, setLoadMsg]   = useState('')
+  const [loggedIn, setLoggedIn]     = useState(() => sessionStorage.getItem('auth') === '1')
+  const [data, setData]             = useState({ vias: [], alt: [] })
+  const [loadState, setLoadState]   = useState('idle')
+  const [loadMsg, setLoadMsg]       = useState('')
+  const [cacheTs, setCacheTs]       = useState(null)
 
-  // Search state
+  // Admin
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
+  const [isAdmin, setIsAdmin]               = useState(false)
+  const [adminToken, setAdminToken]         = useState('')
+  const [updating, setUpdating]             = useState(false)
+  const [updateMsg, setUpdateMsg]           = useState('')
+  const [updateOk, setUpdateOk]             = useState(null) // true | false | null
+
+  // Search
   const [termino, setTermino]     = useState('')
   const [fecha, setFecha]         = useState('')
   const [ugl, setUgl]             = useState('')
   const [prestador, setPrestador] = useState('Todos')
-
-  // Results
-  const [resVias, setResVias] = useState(null)
-  const [resAlt, setResAlt]   = useState(null)
-  const [searched, setSearched] = useState(false)
+  const [resVias, setResVias]     = useState(null)
+  const [resAlt, setResAlt]       = useState(null)
+  const [searched, setSearched]   = useState(false)
 
   const terminoRef = useRef(null)
 
@@ -169,50 +244,83 @@ export default function App() {
     setLoggedIn(true)
   }
 
-  // Cargar datos cuando loguea
+  // Cargar datos al ingresar (desde data.json)
   useEffect(() => {
     if (!loggedIn) return
-    iniciarCarga(false)
+    cargarDatos()
     setTimeout(() => terminoRef.current?.focus(), 100)
   }, [loggedIn])
 
-  const iniciarCarga = useCallback(async (forceRefresh = true) => {
+  const cargarDatos = useCallback(async () => {
     setLoadState('loading')
-    setLoadMsg(forceRefresh ? 'Actualizando datos desde el Sheet...' : 'Cargando datos por primera vez...')
+    setLoadMsg('Cargando datos...')
     try {
-      if (forceRefresh) clearCache()
-      const result = await loadData(forceRefresh)
+      const result = await loadDataFromJSON()
       setData(result)
-      setCacheTimestamp()
-      setCacheTs(new Date())
+      setCacheTs(getCacheTimestamp())
       setLoadState('ready')
       setLoadMsg('')
     } catch (err) {
       console.error(err)
       setLoadState('error')
-      setLoadMsg('Error al cargar datos. Verificá la API Key o el acceso al Sheet.')
+      setLoadMsg(err.message || 'Error al cargar datos.')
     }
   }, [])
 
+  // Admin: actualizar datos desde el Sheet y subir a GitHub
+  const handleActualizar = useCallback(async () => {
+    setUpdating(true)
+    setUpdateMsg('Descargando datos del Sheet...')
+    setUpdateOk(null)
+    try {
+      const result = await loadDataFromSheet()
+      setUpdateMsg('Subiendo datos a GitHub...')
+      await subirDataAGitHub(result, adminToken)
+      setData(result)
+      setCacheTs(new Date())
+      setUpdateMsg('✓ Datos actualizados correctamente. Los usuarios verán los datos nuevos al recargar.')
+      setUpdateOk(true)
+      setLoadState('ready')
+    } catch (err) {
+      console.error(err)
+      setUpdateMsg('✗ Error: ' + err.message)
+      setUpdateOk(false)
+    } finally {
+      setUpdating(false)
+    }
+  }, [adminToken])
+
+  const handleAdminLogin = (token) => {
+    setAdminToken(token)
+    setIsAdmin(true)
+    setShowAdminLogin(false)
+  }
+
   const handleSearch = useCallback(() => {
     if (!termino.trim()) return
-    const fechaMinima = fecha ? (() => { const d = new Date(fecha); d.setHours(0,0,0,0); return d })() : null
+    const fechaMinima = fecha
+      ? (() => { const d = new Date(fecha); d.setHours(0,0,0,0); return d })()
+      : null
     setResVias(buscar(data.vias, termino, fechaMinima, ugl, null))
     setResAlt(buscar(data.alt, termino, fechaMinima, ugl, prestador))
     setSearched(true)
   }, [termino, fecha, ugl, prestador, data])
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') handleSearch()
-  }
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleSearch() }
 
   if (!loggedIn) return <Login onLogin={handleLogin} />
 
-  const totalVias = data.vias.length
-  const totalAlt  = data.alt.length
-
   return (
     <div className={styles.app}>
+
+      {/* MODAL ADMIN LOGIN */}
+      {showAdminLogin && (
+        <AdminLogin
+          onLogin={handleAdminLogin}
+          onClose={() => setShowAdminLogin(false)}
+        />
+      )}
+
       {/* HEADER */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
@@ -221,24 +329,53 @@ export default function App() {
             <h1 className={styles.headerTitle}>Buscador de Insumos</h1>
             <span className={styles.headerSub}>
               {loadState === 'ready'
-                ? `${totalVias.toLocaleString()} VE · ${totalAlt.toLocaleString()} ALT`
+                ? `${data.vias.length.toLocaleString()} VE · ${data.alt.length.toLocaleString()} ALT`
                 : loadState === 'loading' ? 'Cargando...' : ''}
-              {cacheTs && <span className={styles.cacheInfo}> · Datos al {formatDate(cacheTs)}</span>}
+              {cacheTs && (
+                <span className={styles.cacheInfo}> · Datos al {formatDate(cacheTs)}</span>
+              )}
             </span>
           </div>
         </div>
-        <button
-          className={styles.btnRefresh}
-          onClick={() => iniciarCarga(true)}
-          disabled={loadState === 'loading'}
-          title="Actualizar datos desde el Sheet"
-        >
-          {loadState === 'loading' ? '⟳ Cargando...' : '⟳ Actualizar datos'}
-        </button>
+
+        <div className={styles.headerRight}>
+          {isAdmin ? (
+            <div className={styles.adminPanel}>
+              <span className={styles.adminBadge}>🔐 Admin</span>
+              <button
+                className={styles.btnActualizar}
+                onClick={handleActualizar}
+                disabled={updating}
+              >
+                {updating ? '⟳ Actualizando...' : '⟳ Actualizar datos'}
+              </button>
+              <button
+                className={styles.btnAdminOut}
+                onClick={() => { setIsAdmin(false); setAdminToken(''); setUpdateMsg(''); setUpdateOk(null) }}
+              >
+                Salir
+              </button>
+            </div>
+          ) : (
+            <button
+              className={styles.btnAdminLink}
+              onClick={() => setShowAdminLogin(true)}
+            >
+              🔐 Ingreso admin
+            </button>
+          )}
+        </div>
       </header>
 
+      {/* MENSAJE ACTUALIZACIÓN */}
+      {updateMsg && (
+        <div className={updateOk === true ? styles.successBanner : updateOk === false ? styles.errorBanner : styles.loadBanner}>
+          {updating && <span className={styles.spinner} />} {updateMsg}
+        </div>
+      )}
+
       {/* LOADING / ERROR */}
-      {loadState === 'loading' && (
+      {loadState === 'loading' && !updateMsg && (
         <div className={styles.loadBanner}>
           <span className={styles.spinner} /> {loadMsg}
         </div>
@@ -303,7 +440,6 @@ export default function App() {
       {/* RESULTADOS */}
       {searched && (
         <div className={styles.resultsGrid}>
-          {/* VÍAS DE EXCEPCIÓN */}
           <div className={`${styles.column} ${styles.colVias}`}>
             <div className={styles.colHeader}>
               <div className={styles.colTitleRow}>
@@ -315,10 +451,9 @@ export default function App() {
               </div>
               <StatsBar data={resVias} color="#3b82f6" />
             </div>
-            <TablaResultados data={resVias} tipo="vias" />
+            <TablaResultados data={resVias} />
           </div>
 
-          {/* ALTERNATIVOS */}
           <div className={`${styles.column} ${styles.colAlt}`}>
             <div className={styles.colHeader}>
               <div className={styles.colTitleRow}>
@@ -330,7 +465,7 @@ export default function App() {
               </div>
               <StatsBar data={resAlt} color="#22c55e" />
             </div>
-            <TablaResultados data={resAlt} tipo="alt" />
+            <TablaResultados data={resAlt} />
           </div>
         </div>
       )}

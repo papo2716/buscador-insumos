@@ -1,14 +1,15 @@
 // ============================================================
-// FETCHER DE DATOS - Google Sheets API
-// Caché en memoria (dura mientras la pestaña está abierta)
+// FETCHER DE DATOS
+// - Usuarios normales: leen public/data.json (subido por admin)
+// - Admin: lee directo del Google Sheet y sube data.json
 // ============================================================
 
 const SHEET_ID = '1yeQPjiwPbeSdKV9XbYbICa5YxqqTA1A6W1a6uJSWWwE'
-const API_KEY = import.meta.env.VITE_SHEETS_API_KEY
+const API_KEY  = import.meta.env.VITE_SHEETS_API_KEY
 
 // Caché en memoria (dura mientras la pestaña está abierta)
-let memoryCache = null
-let cacheTimestamp = null
+let memoryCache     = null
+let cacheTimestamp  = null
 
 const SHEETS = {
   vias: { name: 'VIAS DE EXCEPCION', range: 'A:R' },
@@ -18,7 +19,6 @@ const SHEETS = {
 function parsePrecio(val) {
   if (!val) return 0
   const str = val.toString().replace(/\$/g, '').trim()
-  // Formato argentino: punto = miles, coma = decimal
   if (str.includes(',')) {
     return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0
   }
@@ -26,7 +26,7 @@ function parsePrecio(val) {
 }
 
 function sheetRowToVias(headers, row) {
-  const get = (col) => {
+  const get = col => {
     const idx = headers.indexOf(col.toLowerCase())
     return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
@@ -42,7 +42,7 @@ function sheetRowToVias(headers, row) {
 }
 
 function sheetRowToAlt(headers, row) {
-  const get = (col) => {
+  const get = col => {
     const idx = headers.indexOf(col.toLowerCase())
     return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
@@ -67,50 +67,38 @@ async function fetchSheet(sheetName, range) {
   return data.values || []
 }
 
-export async function loadData(forceRefresh = false) {
-  // Si hay caché en memoria y no es forzado, devolver caché
-  if (!forceRefresh && memoryCache) {
-    return memoryCache
-  }
-
+// Lee directo del Sheet (solo admin)
+export async function loadDataFromSheet() {
   const results = {}
-
   for (const [key, cfg] of Object.entries(SHEETS)) {
     const values = await fetchSheet(cfg.name, cfg.range)
-
-    if (values.length < 2) {
-      results[key] = []
-      continue
-    }
-
+    if (values.length < 2) { results[key] = []; continue }
     const headers = values[0].map(h => h.toString().toLowerCase().trim())
-    const rows = values.slice(1)
-
-    let parsed
-    if (key === 'vias') {
-      parsed = rows.map(r => sheetRowToVias(headers, r)).filter(r => r.nombre && r.precio > 0)
-    } else {
-      parsed = rows.map(r => sheetRowToAlt(headers, r)).filter(r => r.nombre && r.precio > 0)
-    }
-
-    results[key] = parsed
+    const rows    = values.slice(1)
+    results[key] = key === 'vias'
+      ? rows.map(r => sheetRowToVias(headers, r)).filter(r => r.nombre && r.precio > 0)
+      : rows.map(r => sheetRowToAlt(headers, r)).filter(r => r.nombre && r.precio > 0)
   }
-
-  memoryCache = results
+  memoryCache    = results
   cacheTimestamp = new Date()
-
   return results
 }
 
-export function getCacheTimestamp() {
-  return cacheTimestamp
+// Lee el data.json publicado por el admin (usuarios normales)
+export async function loadDataFromJSON() {
+  if (memoryCache) return memoryCache
+
+  // Agregar timestamp para evitar caché del navegador
+  const url = `./data.json?t=${Date.now()}`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`No se encontró data.json (${res.status}). El admin debe actualizar los datos primero.`)
+  const json = await res.json()
+
+  memoryCache    = { vias: json.vias || [], alt: json.alt || [] }
+  cacheTimestamp = json.updatedAt ? new Date(json.updatedAt) : new Date()
+  return memoryCache
 }
 
-export function setCacheTimestamp() {
-  cacheTimestamp = new Date()
-}
-
-export function clearCache() {
-  memoryCache = null
-  cacheTimestamp = null
-}
+export function getCacheTimestamp() { return cacheTimestamp }
+export function setCacheTimestamp() { cacheTimestamp = new Date() }
+export function clearCache() { memoryCache = null; cacheTimestamp = null }
