@@ -172,19 +172,7 @@ export default function App() {
   // Cargar datos cuando loguea
   useEffect(() => {
     if (!loggedIn) return
-    const cached = localStorage.getItem('cache_vias')
-    if (cached) {
-      // Tiene caché, carga silenciosa
-      setData({
-        vias: JSON.parse(localStorage.getItem('cache_vias') || '[]'),
-        alt:  JSON.parse(localStorage.getItem('cache_alt')  || '[]'),
-      })
-      setCacheTs(getCacheTimestamp())
-      setLoadState('ready')
-    } else {
-      // Sin caché, carga obligatoria
-      iniciarCarga(false)
-    }
+    iniciarCarga(false)
     setTimeout(() => terminoRef.current?.focus(), 100)
   }, [loggedIn])
 

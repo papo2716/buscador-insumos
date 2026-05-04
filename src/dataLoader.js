@@ -1,49 +1,55 @@
 // ============================================================
-// FETCHER DE DATOS - Google Sheets API + caché localStorage
+// FETCHER DE DATOS - Google Sheets API
+// Caché en memoria (dura mientras la pestaña está abierta)
 // ============================================================
 
 const SHEET_ID = '1yeQPjiwPbeSdKV9XbYbICa5YxqqTA1A6W1a6uJSWWwE'
 const API_KEY = import.meta.env.VITE_SHEETS_API_KEY
 
+// Caché en memoria (dura mientras la pestaña está abierta)
+let memoryCache = null
+let cacheTimestamp = null
+
 const SHEETS = {
-  vias: { name: 'VIAS DE EXCEPCION', range: 'A:R', cacheKey: 'cache_vias' },
-  alt:  { name: 'ALTERNATIVOS',      range: 'A:Z', cacheKey: 'cache_alt'  },
+  vias: { name: 'VIAS DE EXCEPCION', range: 'A:R' },
+  alt:  { name: 'ALTERNATIVOS',      range: 'A:Z' },
 }
 
-function parseDate(val) {
-  if (!val) return null
-  // Sheets puede devolver string de fecha en distintos formatos
-  const d = new Date(val)
-  return isNaN(d.getTime()) ? null : d
+function parsePrecio(val) {
+  if (!val) return 0
+  const str = val.toString().replace(/\$/g, '').trim()
+  // Formato argentino: punto = miles, coma = decimal
+  if (str.includes(',')) {
+    return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0
+  }
+  return parseFloat(str.replace(/[^0-9.]/g, '')) || 0
 }
 
 function sheetRowToVias(headers, row) {
   const get = (col) => {
     const idx = headers.indexOf(col.toLowerCase())
-    return idx >= 0 ? row[idx] : ''
+    return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
   return {
     orden:     get('orden ve'),
     nombre:    get('descripcion'),
-    precio:    parseFloat((get('precio') || '').toString().replace(/[$,.\s]/g, '').replace(',', '.')) || 0,
+    precio:    parsePrecio(get('precio')),
     fecha:     get('f_solicitud'),
     prestador: get('detalle_prestador'),
     ugl:       get('c_ugl'),
     proveedor: get('proveedor'),
-    detalle:   get('detalle'),
-    detalleSub: get('detalle_sub'),
   }
 }
 
 function sheetRowToAlt(headers, row) {
   const get = (col) => {
     const idx = headers.indexOf(col.toLowerCase())
-    return idx >= 0 ? row[idx] : ''
+    return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
   return {
     orden:     get('orden alt'),
     nombre:    get('nombre_normalizado'),
-    precio:    parseFloat((get('precio') || '').toString().replace(/[$,.\s]/g, '')) || 0,
+    precio:    parsePrecio(get('precio')),
     fecha:     get('fecha'),
     prestador: get('prestador'),
     ugl:       get('ugl'),
@@ -53,24 +59,29 @@ function sheetRowToAlt(headers, row) {
 async function fetchSheet(sheetName, range) {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheetName + '!' + range)}?key=${API_KEY}`
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`Error ${res.status} al leer ${sheetName}`)
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(`Error ${res.status} al leer "${sheetName}": ${body?.error?.message || res.statusText}`)
+  }
   const data = await res.json()
   return data.values || []
 }
 
 export async function loadData(forceRefresh = false) {
+  // Si hay caché en memoria y no es forzado, devolver caché
+  if (!forceRefresh && memoryCache) {
+    return memoryCache
+  }
+
   const results = {}
 
   for (const [key, cfg] of Object.entries(SHEETS)) {
-    const cached = localStorage.getItem(cfg.cacheKey)
+    const values = await fetchSheet(cfg.name, cfg.range)
 
-    if (!forceRefresh && cached) {
-      results[key] = JSON.parse(cached)
+    if (values.length < 2) {
+      results[key] = []
       continue
     }
-
-    const values = await fetchSheet(cfg.name, cfg.range)
-    if (values.length < 2) { results[key] = []; continue }
 
     const headers = values[0].map(h => h.toString().toLowerCase().trim())
     const rows = values.slice(1)
@@ -82,25 +93,24 @@ export async function loadData(forceRefresh = false) {
       parsed = rows.map(r => sheetRowToAlt(headers, r)).filter(r => r.nombre && r.precio > 0)
     }
 
-    localStorage.setItem(cfg.cacheKey, JSON.stringify(parsed))
     results[key] = parsed
   }
+
+  memoryCache = results
+  cacheTimestamp = new Date()
 
   return results
 }
 
 export function getCacheTimestamp() {
-  // Retorna cuándo se cargaron los datos por última vez
-  const ts = localStorage.getItem('cache_timestamp')
-  return ts ? new Date(parseInt(ts)) : null
+  return cacheTimestamp
 }
 
 export function setCacheTimestamp() {
-  localStorage.setItem('cache_timestamp', Date.now().toString())
+  cacheTimestamp = new Date()
 }
 
 export function clearCache() {
-  localStorage.removeItem('cache_vias')
-  localStorage.removeItem('cache_alt')
-  localStorage.removeItem('cache_timestamp')
+  memoryCache = null
+  cacheTimestamp = null
 }
