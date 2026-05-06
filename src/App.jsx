@@ -175,7 +175,7 @@ function StatsBar({ data, color }) {
 }
 
 // ─── TABLA RESULTADOS ─────────────────────────────────────────────────────────
-function TablaResultados({ data }) {
+function TablaResultados({ data, tipo, onSelect }) {
   if (!data) return null
   if (data.length === 0) return <div className={styles.noResults}>Sin coincidencias</div>
 
@@ -192,7 +192,7 @@ function TablaResultados({ data }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i}>
+            <tr key={i} className={styles.rowClickable} onClick={() => onSelect({ row, tipo })}>
               <td><span className={styles.uglBadge}>{row.ugl}</span></td>
               <td>
                 <span className={styles.orderBadge}>#{row.orden}</span>
@@ -208,6 +208,72 @@ function TablaResultados({ data }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// ─── FICHA DETALLE ────────────────────────────────────────────────────────────
+function val(v) {
+  if (v === null || v === undefined || v === '') return '—'
+  return v
+}
+
+function Ficha({ item, tipo, onClose }) {
+  const { row } = item
+  const esVias = tipo === 'vias'
+  const titulo = esVias ? 'Ficha — Vías de Excepción' : 'Ficha — Alternativos'
+  const accent = esVias ? '#3b82f6' : '#22c55e'
+
+  const campos = esVias
+    ? [
+        { label: 'Código de solicitud',  value: val(row.c_solicitud) },
+        { label: 'Fecha de solicitud',   value: row.fecha ? formatDate(row.fecha) : '—' },
+        { label: 'Tipo de solicitud',    value: val(row.d_tipo_solicitud) },
+        { label: 'Código de insumo',     value: val(row.insumo) },
+        { label: 'Descripción',          value: val(row.nombre), full: true },
+        { label: 'UGL',                  value: val(row.ugl) },
+        { label: 'Código de prestador',  value: val(row.prestador_cod) },
+        { label: 'Prestador',            value: val(row.prestador) },
+        { label: 'Tipo',                 value: val(row.detalle) },
+        { label: 'Sub-Tipo',             value: val(row.detalle_sub) },
+        { label: 'Especificaciones',     value: val(row.espec_tecnicas), full: true },
+        { label: 'Observaciones',        value: val(row.d_observacion), full: true },
+        { label: 'Cantidad',             value: val(row.n_cantidad) },
+        { label: 'Proveedor',            value: val(row.proveedor) },
+        { label: 'Precio',               value: row.precio ? fmt(row.precio) : '—', highlight: true },
+      ]
+    : [
+        { label: 'Nro de presupuesto', value: val(row.presupuesto_nro) },
+        { label: 'Fecha',              value: row.fecha ? formatDate(row.fecha) : '—' },
+        { label: 'Afiliado',           value: ((row.nro_afiliado || '') + ' ' + (row.afiliado_nombre || '')).trim() || '—', full: true },
+        { label: 'Nro de OP',          value: val(row.nro_op) },
+        { label: 'Prestador',          value: val(row.prestador), full: true },
+        { label: 'UGL',                value: val(row.ugl) },
+        { label: 'Insumo',             value: val(row.nombre), full: true },
+        { label: 'Cantidad',           value: val(row.unidades) },
+        { label: 'Precio',             value: row.precio ? fmt(row.precio) : '—', highlight: true },
+      ]
+
+  return (
+    <div className={styles.fichaWrap} style={{ '--accent': accent }}>
+      <div className={styles.fichaHeader}>
+        <button className={styles.btnVolver} onClick={onClose}>← Volver</button>
+        <div className={styles.fichaTitleBlock}>
+          <h2 className={styles.fichaTitle}>{titulo}</h2>
+          <span className={styles.fichaSub}>{row.nombre}</span>
+        </div>
+      </div>
+      <div className={styles.fichaGrid}>
+        {campos.map((c, i) => (
+          <div
+            key={i}
+            className={`${styles.fichaField} ${c.full ? styles.fichaFieldFull : ''} ${c.highlight ? styles.fichaFieldHighlight : ''}`}
+          >
+            <span className={styles.fichaLabel}>{c.label}</span>
+            <span className={styles.fichaValue}>{c.value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -236,6 +302,7 @@ export default function App() {
   const [resVias, setResVias]     = useState(null)
   const [resAlt, setResAlt]       = useState(null)
   const [searched, setSearched]   = useState(false)
+  const [itemSel, setItemSel]     = useState(null)
 
   const terminoRef = useRef(null)
 
@@ -304,6 +371,7 @@ export default function App() {
     setResVias(buscar(data.vias, termino, fechaMinima, ugl, null))
     setResAlt(buscar(data.alt, termino, fechaMinima, ugl, prestador))
     setSearched(true)
+    setItemSel(null)
   }, [termino, fecha, ugl, prestador, data])
 
   const handleKeyDown = (e) => { if (e.key === 'Enter') handleSearch() }
@@ -437,8 +505,13 @@ export default function App() {
         </button>
       </div>
 
+      {/* FICHA DETALLE */}
+      {searched && itemSel && (
+        <Ficha item={itemSel} tipo={itemSel.tipo} onClose={() => setItemSel(null)} />
+      )}
+
       {/* RESULTADOS */}
-      {searched && (
+      {searched && !itemSel && (
         <div className={styles.resultsGrid}>
           <div className={`${styles.column} ${styles.colVias}`}>
             <div className={styles.colHeader}>
@@ -451,7 +524,7 @@ export default function App() {
               </div>
               <StatsBar data={resVias} color="#3b82f6" />
             </div>
-            <TablaResultados data={resVias} />
+            <TablaResultados data={resVias} tipo="vias" onSelect={setItemSel} />
           </div>
 
           <div className={`${styles.column} ${styles.colAlt}`}>
@@ -465,7 +538,7 @@ export default function App() {
               </div>
               <StatsBar data={resAlt} color="#22c55e" />
             </div>
-            <TablaResultados data={resAlt} />
+            <TablaResultados data={resAlt} tipo="alt" onSelect={setItemSel} />
           </div>
         </div>
       )}

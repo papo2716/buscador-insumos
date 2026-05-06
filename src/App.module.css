@@ -423,6 +423,9 @@
 
 .table tr:hover td { background: rgba(255,255,255,0.02); }
 
+.rowClickable { cursor: pointer; }
+.rowClickable:hover td { background: rgba(59, 130, 246, 0.06); }
+
 .uglBadge {
   display: inline-block;
   background: rgba(245, 158, 11, 0.1);
@@ -616,6 +619,109 @@
   transition: color 0.15s;
 }
 .btnClose:hover { color: var(--text); }
+
+/* ─── FICHA DETALLE ───────────────────────────────────────── */
+.fichaWrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.fichaHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.btnVolver {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btnVolver:hover { border-color: var(--accent); color: var(--accent); }
+
+.fichaTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fichaTitle {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.2px;
+}
+
+.fichaSub {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.3;
+}
+
+.fichaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+  max-width: 1100px;
+}
+
+.fichaField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.fichaFieldFull { grid-column: 1 / -1; }
+
+.fichaFieldHighlight {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg2));
+}
+
+.fichaLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text3);
+}
+
+.fichaValue {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.fichaFieldHighlight .fichaValue {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+@media (max-width: 768px) {
+  .fichaGrid { grid-template-columns: 1fr; }
+}
 
 /* SUCCESS BANNER */
 .successBanner {

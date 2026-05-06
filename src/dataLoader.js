@@ -31,13 +31,23 @@ function sheetRowToVias(headers, row) {
     return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
   return {
-    orden:     get('orden ve'),
-    nombre:    get('descripcion'),
-    precio:    parsePrecio(get('precio')),
-    fecha:     get('f_solicitud'),
-    prestador: get('detalle_prestador'),
-    ugl:       get('c_ugl'),
-    proveedor: get('proveedor'),
+    orden:             get('orden ve'),
+    nombre:            get('descripcion'),
+    precio:            parsePrecio(get('precio')),
+    fecha:             get('f_solicitud'),
+    prestador:         get('detalle_prestador'),
+    ugl:               get('c_ugl'),
+    proveedor:         get('proveedor'),
+    // Campos extra para la ficha
+    c_solicitud:       get('c_solicitud'),
+    d_tipo_solicitud:  get('d_tipo_solicitud'),
+    insumo:            get('insumo'),
+    prestador_cod:     get('prestador'),
+    detalle:           get('detalle'),
+    detalle_sub:       get('detalle_sub'),
+    espec_tecnicas:    get('espec_tecnicas'),
+    d_observacion:     get('d_observacion'),
+    n_cantidad:        get('n_cantidad'),
   }
 }
 
@@ -47,12 +57,18 @@ function sheetRowToAlt(headers, row) {
     return idx >= 0 && row[idx] !== undefined ? row[idx] : ''
   }
   return {
-    orden:     get('orden alt'),
-    nombre:    get('nombre_normalizado'),
-    precio:    parsePrecio(get('precio')),
-    fecha:     get('fecha'),
-    prestador: get('prestador'),
-    ugl:       get('ugl'),
+    orden:             get('orden alt'),
+    nombre:            get('nombre_normalizado'),
+    precio:            parsePrecio(get('precio')),
+    fecha:             get('fecha'),
+    prestador:         get('prestador'),
+    ugl:               get('ugl'),
+    // Campos extra para la ficha
+    presupuesto_nro:   get('presupuesto nro'),
+    nro_afiliado:      get('nro afiliado'),
+    afiliado_nombre:   get('nombre'),
+    nro_op:            get('nro de op'),
+    unidades:          get('unidades'),
   }
 }
 
